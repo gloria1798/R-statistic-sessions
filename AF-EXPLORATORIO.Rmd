@@ -1,0 +1,179 @@
+---
+title: "R Notebook"
+---
+## TRABAJO CON LA PRIMERA MUESTRA: AFE analisis factorial exploratorio
+
+**CARGAR LIBRERIAS**
+
+```{r}
+x<-c("haven", "psych",  "lavaan", "lavaan", "MVN", "dplyr", "ggplot2", "parameters", "semPlot", "GPArotation")
+lapply(x, FUN = function(X) {
+    do.call("require", list(X)) 
+})
+```
+
+**OBTENIENDO LOS DATOS**
+
+```{r}
+data <- sjlabelled::read_spss("base_datos.sav")[1:69]
+```
+
+
+**DIVIDIR DOS GRUPOS: PRIMERA MUESTRA Y SEGUNDA MUESTRA**
+La muestra se dividira en dos submuestras independientes homogéneas, la primera sera usada para el analisis factorial exploratorio y el segundo, para el analisis factorial confirmatorio. 
+
+```{r}
+dummy_sep <- rbinom(nrow(data), 1, 0.5) 
+primera_muestra <- data[dummy_sep == 0, ]  # Extraer datos donde dummy == 0
+
+segunda_muestra<- data[dummy_sep == 1, ]   # Extraer datos donde dummy == 1
+
+# ALMACENAMOS LA PRIMERA MUESTRA EN CBPAQ_primera_muestra
+CBPAQ_primera_muestra <- primera_muestra[45:59] %>% tibble() # contiene 100 filas
+
+# Y PARA UNA MEJOR LECTURA, CAMBIAREMOS LOS NOMBRES DE LOS ITEMS POR LOS SIGUIENTES
+names(CBPAQ_primera_muestra) <- c("X1","X2","X3","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14", "X15")
+
+```
+
+
+**ANALISIS FACTORIAL EXPLORATORIO**
+Primero, podemos usar la función *n_factors* para visualizar cual es el numero de factores que mejor esta respaldado por diferentes metodos, solo como una referencia, mas no estamos confirmando aún. Véamos el siguiente código:
+
+```{r}
+results_nfactor <-n_factors(CBPAQ_primera_muestra)
+results_nfactor
+as.data.frame(results_nfactor)
+summary(results_nfactor)
+```
+De acuerdo al siguiente resultado, existen mas pruebas que sostiene una solucion con dos factores, que con 3 factores, aun así se exploraran ambos. Comencemos!!!
+
+**Modelo con 2 factores**
+Ahora exploraremos el modelo con dos factores, para ello usamos la función  *fa* en R, a la cual le pasaremos como parametros: la base de datos de la primera muestra *CBPAQ_primera_muestra*, el numero de factores (2), el método de extracción *Ejes principales*, la rotación, y el tipo de correlación *matriz policorica*.
+
+En el siguiente código, exploraremos tanto con la rotación oblimin como con promax, para observar cual conviene más.
+
+```{r}
+modelo.2f.oblimin <-fa(CBPAQ_primera_muestra, nfactors = 2,fm = "pa",rotate ="oblimin",cor = "poly")
+
+modelo.2f.promax <-fa(CBPAQ_primera_muestra, nfactors = 2,fm = "pa",rotate ="promax",cor = "poly")
+
+par(mfrow = c(1,2))
+
+plot(modelo.2f.oblimin$loadings[,1], 
+     modelo.2f.oblimin$loadings[,2],
+     main = "Oblimin rotation")
+text(modelo.2f.oblimin$loadings[,1]-0.08, 
+     modelo.2f.oblimin$loadings[,2]+0.08,
+      colnames(CBPAQ_primera_muestra),
+      col="blue")
+
+plot(modelo.2f.promax$loadings[,1], 
+     modelo.2f.promax$loadings[,2],
+     main = "Promax rotation")
+text(modelo.2f.promax$loadings[,1]-0.08, 
+     modelo.2f.promax$loadings[,2]+0.08,
+      colnames(CBPAQ_primera_muestra),
+      col="blue")
+```
+
+Conclusion: Metodo de rotacion escogido es promax. Observemos en el siguiente diagrama como luce el modelo de dos factores con promax
+
+```{r}
+fa.diagram(modelo.2f.promax)
+```
+Y en el siguiente codigo, se puede observar las cargas factoriales, las comunalidades h2, y asi mismo la proporcion explicada por cada factor.
+
+```{r}
+modelo.2f.promax
+```
+Como se ve la proporcion explicada de cada uno de los 2 factores 0.64 0.36 (PA1  PA2 , respectivamente)
+
+
+*Analizando las Comunalidades del modelo de 2 factores:*
+
+Las comunalidad son el porcentaje de la variabilidad de la variable explicada por cada item.
+```{r}
+######comunalidades
+sort(modelo.2f.promax$communality,decreasing = T)->c2
+print(c2)
+```
+
+*Analizando las unicidades del modelo de dos factores*
+
+Es el porcentaje de varianza que no ha sido explicada por cada item en el modelo.
+```{r}
+####unicidades 
+sort(modelo.2f.promax$uniquenesses,decreasing = T)->u2
+print(u2)
+```
+
+Conclusion: Tras ver las comunalidades y las unicidades el item 6 es el que menos explica, ya que es inferior a 0.30 en las comunalidades.
+
+
+**MODELO CON 3 FACTORES**
+
+De igual forma exploraremos el modelo con tres factores, para ello usamos la función  *fa* en R, a la cual le pasaremos como parametros: la base de datos de la primera muestra *CBPAQ_primera_muestra*, el numero de factores (3), el método de extracción *Ejes principales*, la rotación, y el tipo de correlación *matriz policorica*.
+
+En el siguiente código, exploraremos tanto con la rotación oblimin como con promax, para observar cual conviene más.
+
+```{r}
+modelo.3f.oblimin <-fa(CBPAQ_primera_muestra, nfactors = 3,fm = "pa",rotate ="oblimin",cor = "poly")
+
+modelo.3f.promax <-fa(CBPAQ_primera_muestra, nfactors = 3,fm = "pa",rotate ="promax",cor = "poly")
+
+par(mfrow = c(1,2))
+
+plot(modelo.3f.oblimin$loadings[,1], 
+     modelo.3f.oblimin$loadings[,2],
+     main = "Oblimin rotation")
+
+text(modelo.3f.oblimin$loadings[,1]-0.08, 
+     modelo.3f.oblimin$loadings[,2]+0.08,
+      colnames(CBPAQ_primera_muestra),
+      col="blue")
+
+plot(modelo.3f.promax$loadings[,1], 
+     modelo.3f.promax$loadings[,2],
+     main = "Promax rotation")
+
+text(modelo.3f.promax$loadings[,1]-0.08, 
+     modelo.3f.promax$loadings[,2]+0.08,
+      colnames(CBPAQ_primera_muestra),
+      col="blue")
+
+```
+
+Conclusion: Metodo de rotacion escogido es promax. Observemos en el siguiente diagrama como luce el modelo de dos factores con promax.
+
+```{r}
+fa.diagram(modelo.3f.promax)
+```
+Y en el siguiente codigo, se puede observar las cargas factoriales, las comunalidades h2, y asi mismo la proporcion explicada por cada factor.
+
+```{r}
+modelo.3f.promax
+```
+Proporcion explicada de cada uno de los 3 factores 0.56 0.34 0.10 (PA1, PA2   y PA3, respectivamente)
+
+*Analizando las Comunalidades del modelo de 3 factores:*
+Porcentaje de la variabilidad de la variable explicada por cada ítem.
+
+```{r}
+sort(modelo.3f.promax$communality,decreasing = T)->c2
+print(c2)
+```
+
+*Analizando las Unicidades del modelo de 3 factores:*
+Es el porcentaje de varianza que no ha sido explicada por el ítem.
+```{r}
+sort(modelo.3f.promax$uniquenesses,decreasing = T)->u2
+print(u2)
+```
+
+De igual forma se observa que el item 6 es el que menos explica en el modelo co 3 factores.
+
+**CONCLUSIÓN**
+De este primer analisis en la primera submuestra, donde se realizó un analisis exploratorio con 2 y 3 factores. Ya que en el modelo con 3 factores, uno de los factores solo posee un item, se opta mejor por preservar el modelo con 2 factores. También se puede determinar el poco funcionamiento del item 6 en la contribución al modelo, por lo que se decide eliminar para los modelos que se evaluaran en el analisis factorial confirmatorio con la segunda muestra.
+
+
