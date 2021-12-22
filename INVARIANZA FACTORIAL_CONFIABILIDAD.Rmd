@@ -1,0 +1,120 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## INVARIANZA FACTORIAL SEGUN SEXO Y CONFIABILIDAD DEL MODELO CON DOS FACTORES
+
+**CARGA DE LIBRERIAS**
+
+```{r}
+setwd("/home/gloria/Desktop/ASESORIA-NATALY/")
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(semTools)
+library(haven)
+library(magrittr) # %>%
+library(tibble)
+library(haven) #read_sav
+library(psych) # omega
+library(multilevel)
+```
+
+**OBTENIENDO LOS DATOS**
+
+```{r}
+data <- sjlabelled::read_spss("base_datos.sav")[1:69]
+
+#ALMACENAMOS LOS DATOS DE LOS ITEMS JUNTO CON LA VARIABLES SEXO
+CBPAQ.sexo <- data %>% dplyr::select("Sexo", "CBPAQ_activo_energía1","CBPAQ_despues_bien2","CBPAQ_organizo_rutina3","CBPAQ_horario_rutina4", "CBPAQ_metas_activo5", "CBPAQ_compromisos6", "CBPAQ_flojo7", "CBPAQ_planb8", "CBPAQ_sentidologro9", "CBPAQ_notiempo10", "CBPAQ_faltamotivacion11", "CBPAQ_otracosa12", "CBPAQ_mejoranimo13", "CBPAQ_aliviaestres14", "CBPAQ_dejocuandodeprimo15")
+
+# Y PARA UNA MEJOR LECTURA, CAMBIAREMOS LOS NOMBRES DE LOS CAMPOS POR LOS SIGUIENTES
+names(CBPAQ.sexo) <- c("Sexo", "X1","X2","X3","X4", "X5", "X6", "X7", "X8","X9", "X10", "X11", "X12", "X13", "X14", "X15")
+```
+
+
+**INVARIANZA FACTORIAL SEGUN SEXO**
+
+**Creando el modelo de 2 factores**
+Primero estableceremos el modelo de dos factores reespecificado, que fue escogido como el de mejor ajuste.
+```{r}
+dosfactor <- 'ExpectAuto =~ X1 + X2 + X9 + X13 + X14 + X5 + X3 + X4 + X15
+Barreras =~ X7 + X10 + X11 + X12 
+'
+```
+
+**Nivel de invarianza configural:**
+
+```{r}
+# measEq.syntax
+CBPAQ.sexo.conf <- measEq.syntax(configural.model = dosfactor, estimator="WLSMV", ID.fac = "std.lv", parameterization = "theta",  group = "Sexo", orthogonal=FALSE, data=CBPAQ.sexo, ID.cat = "Wu.Estabrook.2016",return.fit=TRUE,group.equal = c("thresholds"))
+
+summary(CBPAQ.sexo.conf, fit.measures=TRUE)
+```
+
+**Nivel de invarianza metrica:**
+
+```{r}
+CBPAQ.sexo.metric <- measEq.syntax(configural.model = dosfactor, estimator="WLSMV", ID.fac = "std.lv", parameterization = "theta",  group = "Sexo", orthogonal=FALSE, data=CBPAQ.sexo, ID.cat = "Wu.Estabrook.2016",return.fit=TRUE, group.equal = c("thresholds", "loadings"), long.equal  = c("thresholds","loadings"))
+
+summary(CBPAQ.sexo.metric, fit.measures=TRUE)
+```
+
+**Nivel de invarianza escalar:**
+
+```{r}
+CBPAQ.sexo.scalar <- measEq.syntax(configural.model = dosfactor, estimator="WLSMV", ID.fac = "std.lv", parameterization = "theta",  group = "Sexo", orthogonal=FALSE, data=CBPAQ.sexo, ID.cat = "Wu.Estabrook.2016",return.fit=TRUE, group.equal = c("thresholds", "loadings", "intercepts"), long.equal  = c("thresholds","loadings", "intercepts"))
+
+summary(CBPAQ.sexo.scalar, fit.measures=TRUE)
+```
+
+**Nivel de invarianza estricto:**
+
+```{r}
+CBPAQ.sexo.estricto <- measEq.syntax(configural.model = dosfactor, estimator="WLSMV", ID.fac = "std.lv", parameterization = "theta",  group = "Sexo", orthogonal=FALSE, data=CBPAQ.sexo, ID.cat = "Wu.Estabrook.2016",return.fit=TRUE, group.equal = c("thresholds", "loadings", "intercepts", "residuals"), long.equal  = c("thresholds","loadings", "intercepts", "residuals"))
+
+summary(CBPAQ.sexo.estricto, fit.measures=TRUE)
+```
+
+**Resumen de los resultados del analisis de invarianza**
+
+```{r}
+#organizar datos
+lavaan::anova(CBPAQ.sexo.estricto, CBPAQ.sexo.scalar, CBPAQ.sexo.metric, CBPAQ.sexo.conf)
+
+fit.stats <- rbind( fitmeasures(CBPAQ.sexo.conf, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "rmsea.scaled", "cfi.scaled")),
+fitmeasures(CBPAQ.sexo.metric, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "rmsea.scaled", "cfi.scaled")),
+fitmeasures(CBPAQ.sexo.scalar, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "rmsea.scaled", "cfi.scaled")), 
+fitmeasures(CBPAQ.sexo.estricto, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "rmsea.scaled", "cfi.scaled")))
+rownames(fit.stats) <- c("config","metric","scalar", "estricto")
+fit.stats
+```
+Se puede observar que la escala presenta invarianza factorial de acuerdo al sexo (femenino/masculino) en todos los niveles, solo es necesario llegar hasta el nivel escalar(fuerte) en el reporte.
+
+
+**CONFIABILIDAD OMEGA DE MCDONALD**
+
+En el siguiente código obtendremos el calculo de omega de Mc Donald para el modelo con dos factores, se realiza con la funcion *omega* en R.
+
+```{r}
+#RECOGEMOS LOS DATOS DE LOS ITEMS
+dosfactordata <- CBPAQ.sexo %>% dplyr::select("X1","X2","X3","X4", "X5", "X7", "X9", "X10", "X11", "X12", "X13", "X14", "X15")
+
+#REALIZAMOS EL CALCULO DEL OMEGA
+omg_confi <- omega(dosfactordata, nfactors = 2 , fm="pa", poly = TRUE, rotate = "Promax", plot = TRUE, title = "Omega")
+
+#VISUALIZAMOS LOS RESULTADOS
+omg_confi
+```
+
+Se observar que el coeficiente omega por la escala total es de 0.96, y en los factores es 0.95 y 0.81, respectivamente al F1 y F2. Adicionalmente se observa un alpha total de 0.95. 
+
+Correlacion item-total
+
+```{r}
+item.total(dosfactordata)
+```
+
