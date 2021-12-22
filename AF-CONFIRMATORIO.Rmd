@@ -1,0 +1,104 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## TRABAJO CON LA SEGUNDA MUESTRA: AFC analisis factorial confirmatorio
+
+El análisis factorial confirmatorio se realizara para algunos modelos tomando como medidas los siguientes índices de ajuste: estadistico χ2 , gl (grados de libertad), índice de ajuste comparativo (CFI), índice de Tucker-Lewis (TLI) y error cuadrático medio de aproximación ( RMSEA), con su intervalo de confianza (IC) al 90%. Los valores inferiores a cinco se consideraran aceptables para el índice χ2 / gl, para el CFI y el TLI por encima o cerca de 0,90, y para el RMSEA, por debajo o muy cerca de 0,08. Como regla general, se considera que el ajuste del modelo es bueno cuando χ2 / gl ≤ 3, TLI> 0.90, CFI> 0.95 y RMSEA ≤ 0.08. Tambien el GFI > 0.95, y el SRMR < K, donde K es igual a 1 sobre la raiz cuadrada de n (numero de muestra), es el criterio de Kelley(1935).
+
+Los modelos evaluados serán: 
+*- Modelo original de 3 factores*
+*- Modelo de dos factores explorado reespecificado (se retira el item 6)*
+
+**CARGAR LIBRERIAS**
+```{r}
+setwd("/home/gloria/Desktop/ASESORIA-NATALY/")
+library(tidyverse)
+library(lavaan)
+library(semPlot)
+library(semTools)
+library(haven)
+library(magrittr) # %>%
+library(tibble)
+library(haven) #read_sav
+library(psych) # omega
+```
+
+**OBTENIENDO LOS DATOS**
+```{r}
+data <- sjlabelled::read_spss("base_datos.sav")[1:69]
+```
+
+**OBTENIENDO LA SEGUNDA MUESTRA**
+Como se menciono la segunda muestra sera usada para el analisis factorial confirmatorio. 
+
+```{r}
+dummy_sep <- rbinom(nrow(data), 1, 0.5) 
+primera_muestra <- data[dummy_sep == 0, ]  # Extraer datos donde dummy == 0
+
+segunda_muestra<- data[dummy_sep == 1, ]   # Extraer datos donde dummy == 1
+
+# ALMACENAMOS LA SEGUNDA MUESTRA EN CBPAQ_segunda_muestra
+CBPAQ_segunda_muestra <- segunda_muestra[45:59] %>% tibble()  # 103 filas
+
+# Y PARA UNA MEJOR LECTURA, CAMBIAREMOS LOS NOMBRES DE LOS ITEMS POR LOS SIGUIENTES
+names(CBPAQ_segunda_muestra) <- c("X1","X2","X3","X4", "X5", "X6", "X7", "X8", "X9", "X10", "X11", "X12", "X13", "X14", "X15")
+
+```
+
+
+**CREAMOS LOS MODELOS DE DOS Y TRES FACTORES**
+```{r}
+tresfactor<-'Expect =~ X1 + X2 + X9 + X13 + X14 
+Autorregu =~ X3 + X4 + X5 + X6 + X8
+Barreras =~  X7 + X10 + X11 + X12 + X15
+'
+dosfactor <- 'ExpectAuto =~ X1 + X2 + X9 + X13 + X14 + X5 + X3 + X4 + X15
+Barreras =~ X7 + X10 + X11 + X12 + X8
+'
+```
+
+
+**ANALISIS CONFIRMATORIO DEL MODELO CON 3 FACTORES**
+Vamos a usar la función *cfa* para el analisis confirmatorio, los parámetros que le pasaremos son: el modelo creado con 3 factores, la base de datos de la segunda muestra y el tipo de estimador (WLSMV, ya que es mejor en datos ordinales y cuando la distribucion no es normal). 
+En el siguiente código, obtendremos los indices de ajuste mencionados al inicio:
+
+```{r}
+CFAtresfactor <- cfa(tresfactor, orthogonal=FALSE, data= CBPAQ_segunda_muestra, lavOptions('estimator = WLSMV'), ordered =names(CBPAQ_segunda_muestra))
+
+#organizar datos para una mejor visualización
+fit.stats.tres <- rbind( fitmeasures(CFAtresfactor, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr", "gfi"))) 
+rownames(fit.stats.tres) <- c("CFAtresfactor")
+fit.stats.tres
+```
+
+**GRAFICO DEL MODELO CON 3 FACTORES**
+
+```{r}
+CFA_tres_factor_path <- semPaths(CFAtresfactor, what = "paths", whatLabels = "par", intercepts = FALSE)
+```
+
+**ANALISIS CONFIRMATORIO DEL MODELO CON 2 FACTORES**
+De igual forma vamos a usar la función *cfa* para el analisis confirmatorio, los parámetros que le pasaremos son: el modelo creado con 2 factores, la base de datos de la segunda muestra y el tipo de estimador (WLSMV, ya que es mejor en datos ordinales y cuando la distribucion no es normal). 
+En el siguiente código, obtendremos los indices de ajuste del modelo:
+
+```{r}
+CFAdosfactor <- cfa(dosfactor, orthogonal=FALSE, data= CBPAQ_segunda_muestra, lavOptions('estimator = WLSMV'), ordered = names(CBPAQ_segunda_muestra))
+
+#organizar datos para una mejor visualización
+fit.stats.dos <- rbind( fitmeasures(CFAdosfactor, fit.measures = c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled", "srmr", "gfi")))
+rownames(fit.stats.dos) <- c("CFAdosfactor")
+fit.stats.dos
+```
+
+**GRAFICO DEL MODELO CON 2 FACTORES**
+
+```{r}
+CFA_dos_factor_path <- semPaths(CFAdosfactor, what = "paths", whatLabels = "par", intercepts = FALSE)
+```
+
+Se opta por el modelo de dos factores reespecificado tomando en cuenta que presenta buenos indices de ajuste. Ademas, si bien el de tres factores original presenta tambien buenos indices de ajuste, se opta por el de dos factores reespecificado debido a que en el analisis exploratorio se encontro mayor soporte a la existencia de 2 factores. Con ello se procede al analisis de la invarianza factorial.
+
