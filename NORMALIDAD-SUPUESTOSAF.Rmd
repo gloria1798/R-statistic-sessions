@@ -1,0 +1,117 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+## ANALISIS DE NORMALIDAD Y SUPUESTOS PARA ANALISIS FACTORIAL
+
+```{r}
+setwd("/home/gloria/Desktop/ASESORIA-NATALY/")
+```
+
+**CARGAR LIBRERIAS**
+```{r}
+x<-c("haven", "psych",  "lavaan", "lavaan", "MVN", "dplyr", "ggplot2", "parameters", "polycor", "ggcorrplot")
+lapply(x, FUN = function(X) {
+    do.call("require", list(X)) 
+})
+```
+
+**OBTENIENDO LOS DATOS**
+
+```{r}
+data <- sjlabelled::read_spss("base_datos.sav")[1:69]
+data$Edad <- cut(data$Edad, breaks=c(18, 21, 25), include.lowest=TRUE)
+data$Edad <- factor(data$Edad, labels = c("18-21", "22-25"))
+
+#ALMACENAMOS LOS DATOS DE LOS ITEMS DEL CUESTIONARIO CBPAQ
+data_CBPAQ <- data[45:59] %>% tibble()
+head(data_CBPAQ)
+```
+
+**ANÁLISIS DE NORMALIDAD**
+
+**Criterios de curtosis y asimetria**
+Generalmente las colas(simetria) y la curtosis debe ser 0 en caso de una normalidad.
+```{r}
+describe(data_CBPAQ)
+```
+
+**Criterios de Shapiro wilk y Kolmogorov smirnov**
+Se usara los criterios de Shapiro wilk modificacion de royston y de kolmogorov smirnov modificacion lilliefors.
+
+```{r}
+normality_CBPAQ_SW <- mvn(data = data_CBPAQ, univariateTest ="SW", univariatePlot = "qq", showOutliers = TRUE)[2]%>%as.data.frame()
+names(normality_CBPAQ_SW) <- c("Test de Normalidad", "Variable", "Estadistico", "p-value", "Normalidad")
+
+normality_CBPAQ_Lillie <- mvn(data = data_CBPAQ, univariateTest = "Lillie", showOutliers = TRUE)[2]%>%as.data.frame()
+names(normality_CBPAQ_Lillie) <- c("Test de Normalidad", "Variable", "Estadistico", "p-value", "Normalidad")
+
+normality_CBPAQ_tests <- as.data.frame(rbind(normality_CBPAQ_SW, normality_CBPAQ_Lillie))
+normality_CBPAQ_tests
+```
+
+Ya que son no normales, si se desea reportar a nivel univariante, las medidas de tendencia centras mas adecuads son la mediana junto a los minimos y maximos a nivel univariante. 
+
+PARA EL REPORTE: En la parte descriptiva podria armarse una tabla con los items, la mediana los minimos y maximos, y al costado los estadisticos de Shapiro y Kolmogorov, asi como la decision de SI/NO
+
+**ANALISIS FACTORIAL**
+
+**Supuestos:**
+
+**-->** *Normalidad Multivariante*
+Si los pvalues obtenidos son mayores a 0.05 se considera una normalidad multivariante.
+
+Prueba de Royston
+```{r}
+mvn(data = data_CBPAQ, mvnTest = "royston", multivariatePlot = "qq", multivariateOutlierMethod = "adj", showOutliers = FALSE)$multivariateNormality
+
+```
+
+Prueba de Mardia
+```{r}
+mvn(data = data_CBPAQ, mvnTest = "mardia", multivariatePlot = "qq", multivariateOutlierMethod = "adj", showOutliers = FALSE)$multivariateNormality
+```
+En el caso de la prueba de Mardia, ambos valores p de las estadísticas de asimetría y curtosis deben ser superiores a 0,05. Lo cual, no es el caso.
+
+
+**-->** *Matriz de correlacion policorica*
+Ya que la escala CBPAQ presenta un tipo de respuesta politomica, con valores de respuesta tipo ordinales (1-5), es recomendable hacer uso de una matriz de correlacion policorica. Con ella, podemos verificar si es posible realizar una analisis factorial con los test de Barlet y KMO.
+
+```{r}
+mat_cor <- hetcor(data_CBPAQ)$correlations #matriz de correlación policorica
+ggcorrplot(mat_cor,type="lower",hc.order = T)
+```
+
+**-->** *Prueba de esfericidad de Bartlett*
+Se utiliza para probar la hipótesis nula que afirma que las variables no están correlacionadas en la población.
+
+```{r}
+cortest.bartlett(mat_cor, diag=TRUE)-> p_esf
+p_esf
+```
+
+El resultado del p valor nos permite rechazar la hipótesis nula, es decir se concluye que las variables estan intercorrelacioandos, por lo tanto se procede a un analisis factorial.
+
+**-->** *Criterio de Kaiser-Meyer-Olkin*
+La prueba KMO es una medida de qué tan adecuados son sus datos para el análisis factorial . La prueba mide la adecuación del muestreo para cada variable en el modelo y para el modelo completo. La estadística es una medida de la proporción de varianza entre variables que podrían ser varianza común.
+
+```{r}
+KMO(mat_cor)
+```
+Kaiser puso los siguientes valores en los resultados:
+
+    0.00 a 0.49 inaceptable.
+    0.50 a 0.59 miserable.
+    0,60 a 0,69 mediocre.
+    0.70 a 0.79 medio.
+    0,80 a 0,89 meritorio.
+    0.90 a 1.00 maravilloso.
+
+El resultado es 0.96 lo que nos dice que podemos continuar con el análisis Factorial.
+
+
+
+
